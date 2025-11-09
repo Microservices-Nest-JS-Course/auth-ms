@@ -1,0 +1,61 @@
+# Dependencias
+# con as deps le digo que esta etapa es conocida como las deps o dependencias
+# Esta seccion simplemente carga todos los paquetes o todas las dependencias que vamos a tener
+FROM node:24-alpine AS deps
+
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+WORKDIR /usr/src/app
+# Verifica si el archivo está exactamente igual al que tiene, usa el de caché:
+# si está igual, mantiene el cache, si no, vuelve a instalar dependencias
+COPY package.json ./
+COPY pnpm-lock.yaml ./
+
+RUN pnpm install
+
+
+# Builder - Construye la aplicación
+# Objetivo de esta imagen es construirlo
+FROM node:24-alpine AS build
+
+WORKDIR /usr/src/app
+
+# Necesitas pnpm aquí para ejecutar 'pnpm build' y 'pnpm ci'
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+# Copiar de deps, los módulos de node
+# Tengo aqui el origen y destino
+COPY --from=deps /usr/src/app/node_modules ./node_modules
+# Copiar todo el codigo fuente de la aplicacion, copiamos todo lo que no está definido el dockerignore
+COPY . .
+# RUN pnpm test # Ejecutar los tests
+RUN pnpm build
+
+# Prisma: genera el cliente de prisma
+RUN npx prisma generate
+
+# Opcional: solo para hacer limpieza de los modulos de node que no necesito: ayuda a reducir el peso
+RUN pnpm prune --prod
+
+
+# Crear la imagen final de Docker
+FROM node:24-alpine AS prod
+
+WORKDIR /usr/src/app
+# Copiar modulos de node
+COPY --from=build /usr/src/app/node_modules ./node_modules
+# Copiar el codigo de la aplicacion de js
+COPY --from=build /usr/src/app/dist ./dist
+# Copiar el codigo de la aplicacion de prisma
+COPY --from=build /usr/src/app/prisma ./prisma
+
+COPY --from=build /usr/src/app/generated ./generated
+
+ENV node_env=production
+# En produccion el usuario por defecto de docker tiene muchos privilegios
+# si le asigno un usuario, eso significa que el usuario que se ejecuta en el contenedor
+USER node
+# Exponemos el puerto 3000
+EXPOSE 3000
+
+CMD [ "node", "dist/main.js" ]

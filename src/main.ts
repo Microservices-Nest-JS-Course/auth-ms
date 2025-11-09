@@ -26,5 +26,6 @@ async function bootstrap() {
 
   await app.listen();
   logger.log(`Auth Microservice running on port: ${envs.authMsPort}`);
+  logger.log('Microservice is listening for requests.');
 }
 bootstrap();
