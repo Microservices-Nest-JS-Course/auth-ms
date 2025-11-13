@@ -4,7 +4,9 @@ steps:
       [
         "build",
         "-t",
-        "northamerica-northeast1-docker.pkg.dev/tienda-microservices-477504/image-registry/auth-ms",
+        "northamerica-northeast1-docker.pkg.dev/tienda-microservices-477504/image-registry/auth-ms:$SHORT_SHA",
+        "-t",
+        "northamerica-northeast1-docker.pkg.dev/tienda-microservices-477504/image-registry/auth-ms:latest",
         "-f",
         "dockerfile.prod",
         "--platform=linux/amd64",
@@ -15,6 +17,16 @@ steps:
       [
         "push",
         "northamerica-northeast1-docker.pkg.dev/tienda-microservices-477504/image-registry/auth-ms",
+        "--all-tags"
       ]
+  - name: "gcr.io/cloud-builders/kubectl"
+    args:
+      - "set"
+      - "image"
+      - "deployment/auth-ms"
+      - "auth-ms=northamerica-northeast1-docker.pkg.dev/tienda-microservices-477504/image-registry/auth-ms:$SHORT_SHA"
+    env:
+      - "CLOUDSDK_COMPUTE_REGION=northamerica-northeast1"
+      - "CLOUDSDK_CONTAINER_CLUSTER=tienda-cluster"
 options:
   logging: CLOUD_LOGGING_ONLY 
